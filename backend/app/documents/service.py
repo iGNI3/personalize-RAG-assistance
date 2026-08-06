@@ -46,6 +46,14 @@ def save_uploaded_file(saved_filename: str, original_filename: str, content_type
     upload_date = datetime.utcnow().isoformat()
     roles_str = ",".join(access_roles)
 
+    # Normalise file_type: use the actual extension when MIME is generic
+    ext = os.path.splitext(original_filename)[1].lower()
+    if content_type in ("application/octet-stream", "application/x-pdf", "") or not content_type:
+        if ext == ".pdf":
+            content_type = "application/pdf"
+        elif ext == ".docx":
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(

@@ -28,23 +28,29 @@ async def upload_document(
     if ext not in [".pdf", ".docx"] and file.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
         
+    # Ensure uploads dir exists (ephemeral containers may lose it)
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
     # Save file to disk
-    original_fname = file.filename
+    original_fname = file.filename or "upload"
     temp_doc_id = os.urandom(8).hex()
+    # Keep extension in saved name so parser can always infer type from path
     temp_filename = f"{temp_doc_id}_{original_fname}"
     file_path = os.path.join(settings.UPLOAD_DIR, temp_filename)
-    
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
     async with aiofiles.open(file_path, 'wb') as out_file:
-        content = await file.read()
         await out_file.write(content)
-        
+
     roles = [role.strip() for role in access_roles.split(",")]
-    
-    metadata = save_uploaded_file(temp_filename, original_fname, file.content_type, current_user.username, roles)
-    
+    metadata = save_uploaded_file(temp_filename, original_fname, file.content_type or "", current_user.username, roles)
+
     # Process in background
     background_tasks.add_task(process_document, metadata.id, request.app.state)
-    
+
     return DocumentResponse(metadata=metadata, message="Document uploaded and processing started")
 
 @router.get("", response_model=DocumentListResponse)
