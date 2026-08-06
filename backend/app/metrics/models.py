@@ -1,8 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 class QueryMetric(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     query: str
     answer: str
     model_name: str
