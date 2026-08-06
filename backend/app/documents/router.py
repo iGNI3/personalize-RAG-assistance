@@ -3,7 +3,6 @@ from app.documents.models import DocumentResponse, DocumentListResponse, Documen
 from app.documents.service import save_uploaded_file, process_document, list_documents, get_document, delete_document
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
-import aiofiles
 import os
 from app.config import settings
 
@@ -19,7 +18,7 @@ async def upload_document(
 ):
     ext = os.path.splitext(file.filename or "")[1].lower()
     allowed_types = [
-        "application/pdf", 
+        "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/octet-stream",
         "application/x-pdf",
@@ -27,47 +26,56 @@ async def upload_document(
     ]
     if ext not in [".pdf", ".docx"] and file.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
-        
-    # Ensure uploads dir exists (ephemeral containers may lose it)
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
-    # Save file to disk
-    original_fname = file.filename or "upload"
-    temp_doc_id = os.urandom(8).hex()
-    # Keep extension in saved name so parser can always infer type from path
-    temp_filename = f"{temp_doc_id}_{original_fname}"
-    file_path = os.path.join(settings.UPLOAD_DIR, temp_filename)
-
+    # Read file bytes into memory
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    async with aiofiles.open(file_path, 'wb') as out_file:
-        await out_file.write(content)
+    original_fname = file.filename or "upload"
+    temp_doc_id = os.urandom(8).hex()
+    temp_filename = f"{temp_doc_id}_{original_fname}"
+
+    # Also write to disk as a best-effort cache (helps local dev & same-session processing)
+    try:
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        file_path = os.path.join(settings.UPLOAD_DIR, temp_filename)
+        with open(file_path, "wb") as f:
+            f.write(content)
+    except Exception:
+        pass  # Disk write failure is OK — bytes are safely stored in the DB
 
     roles = [role.strip() for role in access_roles.split(",")]
-    metadata = save_uploaded_file(temp_filename, original_fname, file.content_type or "", current_user.username, roles)
+    metadata = save_uploaded_file(
+        temp_filename, original_fname,
+        file.content_type or "",
+        current_user.username, roles,
+        content  # <-- bytes stored in PostgreSQL
+    )
 
     # Process in background
     background_tasks.add_task(process_document, metadata.id, request.app.state)
 
     return DocumentResponse(metadata=metadata, message="Document uploaded and processing started")
 
+
 @router.get("", response_model=DocumentListResponse)
 async def get_documents(current_user: User = Depends(get_current_user)):
     docs = list_documents(current_user.role)
     return DocumentListResponse(documents=docs, total=len(docs))
+
 
 @router.get("/{doc_id}", response_model=DocumentMetadata)
 async def get_single_document(doc_id: str, current_user: User = Depends(get_current_user)):
     doc = get_document(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-        
+
     if current_user.role != "admin" and current_user.role not in doc.access_roles and "all" not in doc.access_roles:
         raise HTTPException(status_code=403, detail="Not authorized to access this document")
-        
+
     return doc
+
 
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_document(request: Request, doc_id: str, current_user: User = Depends(require_role("admin"))):

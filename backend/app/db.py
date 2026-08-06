@@ -66,7 +66,8 @@ def init_db():
             file_size_bytes BIGINT,
             num_pages INTEGER DEFAULT 0,
             num_chunks INTEGER DEFAULT 0,
-            error_message TEXT DEFAULT NULL
+            error_message TEXT DEFAULT NULL,
+            file_content BYTEA DEFAULT NULL
         );
         """)
 
@@ -136,7 +137,8 @@ def init_db():
             file_size_bytes INTEGER,
             num_pages INTEGER DEFAULT 0,
             num_chunks INTEGER DEFAULT 0,
-            error_message TEXT DEFAULT NULL
+            error_message TEXT DEFAULT NULL,
+            file_content BLOB DEFAULT NULL
         );
         """)
 

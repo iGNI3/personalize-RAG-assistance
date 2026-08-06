@@ -18,20 +18,42 @@ from app.rag.vectorstore import ChromaManager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize SQLite DB and default users
+    from app.db import get_db_connection, USE_POSTGRES
+
+    # Initialize DB tables and default users
     init_db()
     seed_default_users()
-    
+
+    # Safe migration: add file_content column if it doesn't exist yet
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        if USE_POSTGRES:
+            cur.execute("""
+                ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_content BYTEA DEFAULT NULL;
+            """)
+        else:
+            # SQLite: check if column exists first
+            cur.execute("PRAGMA table_info(documents)")
+            cols = [r["name"] for r in cur.fetchall()]
+            if "file_content" not in cols:
+                cur.execute("ALTER TABLE documents ADD COLUMN file_content BLOB DEFAULT NULL")
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        import logging
+        logging.warning(f"Migration warning (safe to ignore): {e}")
+
     # Initialize upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    
+
     # Initialize genai and Chroma
     init_embedding_model(settings.GEMINI_API_KEY)
     init_llm(settings.GEMINI_API_KEY)
     app.state.chroma_manager = ChromaManager(settings.CHROMA_PERSIST_DIR)
-    
+
     yield
-    
+
     # Cleanup on shutdown if needed
     pass
 

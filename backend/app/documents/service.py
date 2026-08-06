@@ -1,5 +1,6 @@
 import uuid
 import os
+import tempfile
 from datetime import datetime
 from app.documents.models import DocumentMetadata, DocumentStatus
 from app.documents.parser import extract_text
@@ -39,14 +40,15 @@ def row_to_doc(row) -> DocumentMetadata:
     )
 
 
-def save_uploaded_file(saved_filename: str, original_filename: str, content_type: str, uploader: str, access_roles: list[str]) -> DocumentMetadata:
+def save_uploaded_file(saved_filename: str, original_filename: str, content_type: str,
+                       uploader: str, access_roles: list[str], file_bytes: bytes) -> DocumentMetadata:
+    """Save document metadata AND raw file bytes to the database (survives container restarts)."""
     doc_id = str(uuid.uuid4())
-    file_path = os.path.join(settings.UPLOAD_DIR, saved_filename)
-    file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+    file_size = len(file_bytes)
     upload_date = datetime.utcnow().isoformat()
     roles_str = ",".join(access_roles)
 
-    # Normalise file_type: use the actual extension when MIME is generic
+    # Normalise file_type from extension when MIME is generic
     ext = os.path.splitext(original_filename)[1].lower()
     if content_type in ("application/octet-stream", "application/x-pdf", "") or not content_type:
         if ext == ".pdf":
@@ -58,27 +60,81 @@ def save_uploaded_file(saved_filename: str, original_filename: str, content_type
     cursor = conn.cursor()
     cursor.execute(
         _q("""INSERT INTO documents
-        (id, filename, original_filename, file_type, upload_date, uploader, access_roles, status, file_size_bytes, num_pages, num_chunks, error_message)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""),
-        (doc_id, saved_filename, original_filename, content_type, upload_date, uploader, roles_str, DocumentStatus.processing.value, file_size, 0, 0, None)
+        (id, filename, original_filename, file_type, upload_date, uploader, access_roles, status, file_size_bytes, num_pages, num_chunks, error_message, file_content)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""),
+        (doc_id, saved_filename, original_filename, content_type, upload_date, uploader, roles_str,
+         DocumentStatus.processing.value, file_size, 0, 0, None,
+         file_bytes if USE_POSTGRES else file_bytes)
     )
     conn.commit()
     conn.close()
     return get_document(doc_id)
 
 
+def _get_temp_file(doc_id: str, original_filename: str) -> str | None:
+    """
+    Return a path to a temp file containing the document's bytes.
+    The caller is responsible for deleting the temp file when done.
+    First checks the local upload dir, then falls back to the DB.
+    """
+    ext = os.path.splitext(original_filename)[1].lower()
+
+    # Check on-disk first (local dev / freshly uploaded)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(_q("SELECT filename, file_content FROM documents WHERE id = ?"), (doc_id,))
+    row = _row(cursor.fetchone())
+    conn.close()
+
+    if not row:
+        return None
+
+    # Try disk path first
+    disk_path = os.path.join(settings.UPLOAD_DIR, row["filename"])
+    if os.path.exists(disk_path):
+        return disk_path  # Return disk path (caller should NOT delete this one)
+
+    # Fall back to DB bytes
+    raw = row.get("file_content")
+    if raw:
+        # Write to a temp file so parsers can open it normally
+        suffix = ext or ".bin"
+        tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        if isinstance(raw, memoryview):
+            raw = bytes(raw)
+        tmp.write(raw)
+        tmp.flush()
+        tmp.close()
+        return tmp.name  # Caller must delete this
+
+    return None
+
+
 async def process_document(doc_id: str, app_state):
     conn = get_db_connection()
     cursor = conn.cursor()
+    tmp_path = None
+    created_tmp = False
     try:
         metadata = get_document(doc_id)
         if not metadata:
             return
-        file_path = os.path.join(settings.UPLOAD_DIR, metadata.filename)
 
+        file_path = _get_temp_file(doc_id, metadata.original_filename)
+        if not file_path:
+            raise Exception("File content not found in database or disk")
+
+        # Track if we created a temp file (must clean up)
+        disk_path = os.path.join(settings.UPLOAD_DIR, metadata.filename)
+        if file_path != disk_path:
+            created_tmp = True
+            tmp_path = file_path
+
+        # 1. Parse
         pages = extract_text(file_path, metadata.file_type)
         num_pages = len(pages)
 
+        # 2. Chunk
         chunks = create_chunks_with_metadata(
             pages, settings.CHUNK_SIZE, settings.CHUNK_OVERLAP, doc_id, metadata.original_filename
         )
@@ -87,9 +143,11 @@ async def process_document(doc_id: str, app_state):
         if not chunks:
             raise Exception("No text found in document")
 
+        # 3. Embed
         texts = [c["text"] for c in chunks]
         embeddings = get_embeddings_batch(texts)
 
+        # 4. Store in Chroma
         chroma_manager = app_state.chroma_manager
         for chunk in chunks:
             chunk["access_roles"] = ",".join(metadata.access_roles)
@@ -110,6 +168,12 @@ async def process_document(doc_id: str, app_state):
         conn.commit()
     finally:
         conn.close()
+        # Clean up temp file if we created one
+        if created_tmp and tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 def get_document(doc_id: str) -> DocumentMetadata:
@@ -127,7 +191,7 @@ def list_documents(user_role: str) -> list[DocumentMetadata]:
     role_val = user_role.value if hasattr(user_role, "value") else user_role
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM documents ORDER BY upload_date DESC")
+    cursor.execute("SELECT id, filename, original_filename, file_type, upload_date, uploader, access_roles, status, file_size_bytes, num_pages, num_chunks, error_message FROM documents ORDER BY upload_date DESC")
     rows = cursor.fetchall()
     conn.close()
 
@@ -147,6 +211,7 @@ def delete_document(doc_id: str, app_state) -> bool:
     chroma_manager = app_state.chroma_manager
     chroma_manager.delete_by_doc_id(doc_id)
 
+    # Delete disk file if it still exists
     file_path = os.path.join(settings.UPLOAD_DIR, doc.filename)
     if os.path.exists(file_path):
         try:
