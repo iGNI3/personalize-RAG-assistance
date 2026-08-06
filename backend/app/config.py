@@ -1,8 +1,10 @@
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
-    DB_PATH: str = "./rag_app.db"
+    DATABASE_URL: Optional[str] = None          # PostgreSQL URL from Render
+    DB_PATH: str = "./rag_app.db"               # Fallback SQLite (local dev)
     CHROMA_PERSIST_DIR: str = "./chroma_data"
     CHUNK_SIZE: int = 500
     CHUNK_OVERLAP: int = 50
@@ -13,7 +15,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MODEL_NAME: str = "gemini-2.5-flash"
     EMBEDDING_MODEL: str = "models/gemini-embedding-2"
-    
+
     class Config:
         env_file = ".env"
 

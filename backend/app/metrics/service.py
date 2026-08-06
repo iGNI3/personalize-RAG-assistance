@@ -1,19 +1,33 @@
 from app.metrics.models import QueryMetric, MetricsSummary
 from typing import List
 from datetime import datetime, timedelta
-from app.db import get_db_connection
+from app.db import get_db_connection, USE_POSTGRES
+
+
+def _q(sql: str) -> str:
+    return sql.replace("?", "%s") if USE_POSTGRES else sql
+
+
+def _row(row) -> dict | None:
+    if row is None:
+        return None
+    return dict(row)
+
 
 def add_metric(metric: QueryMetric) -> None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """INSERT INTO query_metrics 
+        _q("""INSERT INTO query_metrics
         (query, answer, model_name, response_time_ms, prompt_tokens, completion_tokens, total_tokens, status, sources_count, timestamp, user_username)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (metric.query, metric.answer, metric.model_name, float(metric.response_time_ms), metric.prompt_tokens, metric.completion_tokens, metric.total_tokens, metric.status, metric.sources_count, metric.timestamp.isoformat(), metric.user)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""),
+        (metric.query, metric.answer, metric.model_name, float(metric.response_time_ms),
+         metric.prompt_tokens, metric.completion_tokens, metric.total_tokens,
+         metric.status, metric.sources_count, metric.timestamp.isoformat(), metric.user)
     )
     conn.commit()
     conn.close()
+
 
 def get_all_metrics() -> List[QueryMetric]:
     conn = get_db_connection()
@@ -23,6 +37,7 @@ def get_all_metrics() -> List[QueryMetric]:
     conn.close()
     metrics = []
     for r in rows:
+        r = _row(r)
         metrics.append(QueryMetric(
             query=r["query"],
             answer=r["answer"],
@@ -37,6 +52,7 @@ def get_all_metrics() -> List[QueryMetric]:
             user=r["user_username"] or "unknown"
         ))
     return metrics
+
 
 def get_summary() -> MetricsSummary:
     all_metrics = get_all_metrics()
@@ -61,17 +77,15 @@ def get_summary() -> MetricsSummary:
             recent_queries=[],
             timeseries=timeseries
         )
-        
+
     total_time = sum(m.response_time_ms for m in all_metrics)
     total_tokens = sum(m.total_tokens for m in all_metrics)
     successful = sum(1 for m in all_metrics if m.status == "success")
-    
     models = {}
     for m in all_metrics:
         models[m.model_name] = models.get(m.model_name, 0) + 1
-        
     recent = all_metrics[:10]
-    
+
     return MetricsSummary(
         total_queries=total,
         avg_response_time=total_time / total,
