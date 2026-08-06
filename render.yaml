@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: personalize-rag-backend
+    env: docker
+    dockerfilePath: Dockerfile.backend
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CHROMA_PERSIST_DIRECTORY
+        value: ./chroma_data
+      - key: UPLOAD_DIR
+        value: ./uploads
