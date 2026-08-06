@@ -155,7 +155,7 @@ const ChatMessage = ({ message }) => {
           {/* Response Body with Claude-style rich markdown typography */}
           <div className="p-6 sm:p-8 text-sm md:text-base text-slate-100 selection:bg-cyan-500/30 selection:text-white">
             <ReactMarkdown components={markdownComponents}>
-              {message.content}
+              {String(message.content || '')}
             </ReactMarkdown>
           </div>
 
@@ -163,20 +163,26 @@ const ChatMessage = ({ message }) => {
           {message.metrics && (
             <div className="px-6 py-3.5 bg-slate-950/80 border-t border-white/10 flex flex-wrap gap-3 text-xs text-slate-400 items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 bg-cyan-500/15 text-cyan-300 px-3 py-1 rounded-xl border border-cyan-500/30 font-bold shadow-sm">
-                  <Clock size={13} className="text-cyan-400" />
-                  <span>{message.metrics.response_time_ms}ms response</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-indigo-500/15 text-indigo-300 px-3 py-1 rounded-xl border border-indigo-500/30 font-bold shadow-sm">
-                  <Cpu size={13} className="text-indigo-400" />
-                  <span>{message.metrics.model_name}</span>
-                </div>
+                {message.metrics.response_time_ms != null && (
+                  <div className="flex items-center gap-1.5 bg-cyan-500/15 text-cyan-300 px-3 py-1 rounded-xl border border-cyan-500/30 font-bold shadow-sm">
+                    <Clock size={13} className="text-cyan-400" />
+                    <span>{message.metrics.response_time_ms}ms response</span>
+                  </div>
+                )}
+                {(message.metrics.model || message.metrics.model_name) && (
+                  <div className="flex items-center gap-1.5 bg-indigo-500/15 text-indigo-300 px-3 py-1 rounded-xl border border-indigo-500/30 font-bold shadow-sm">
+                    <Cpu size={13} className="text-indigo-400" />
+                    <span>{message.metrics.model || message.metrics.model_name}</span>
+                  </div>
+                )}
               </div>
-              
-              <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-xl border border-white/10 text-slate-300 font-medium">
-                <span>Context Volume:</span>
-                <span className="text-cyan-300 font-extrabold">{message.metrics.total_tokens} tokens</span>
-              </div>
+
+              {message.metrics.total_tokens != null && (
+                <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-xl border border-white/10 text-slate-300 font-medium">
+                  <span>Context Volume:</span>
+                  <span className="text-cyan-300 font-extrabold">{message.metrics.total_tokens} tokens</span>
+                </div>
+              )}
             </div>
           )}
         </div>
