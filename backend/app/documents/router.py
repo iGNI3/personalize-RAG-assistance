@@ -15,9 +15,17 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     access_roles: str = Form("all"),
-    current_user: User = Depends(require_role("admin", "analyst"))
+    current_user: User = Depends(get_current_user)
 ):
-    if file.content_type not in ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    allowed_types = [
+        "application/pdf", 
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/octet-stream",
+        "application/x-pdf",
+        "application/msword"
+    ]
+    if ext not in [".pdf", ".docx"] and file.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
         
     # Save file to disk

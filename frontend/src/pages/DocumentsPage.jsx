@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, File, FileText, Trash2, Clock, Users, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, File, FileText, Trash2, Clock, Users, Activity, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import FileUpload from '../components/FileUpload';
 import { SkeletonLoader } from '../components/LoadingStates';
 import { api } from '../api/client';
