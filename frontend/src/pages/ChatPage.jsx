@@ -16,10 +16,10 @@ const ChatPage = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sourcesPanelOpen, setSourcesPanelOpen] = useState(true);
-  
+
   const { isGuest } = useAuth();
   const { addToast } = useToast();
-  
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -97,7 +97,7 @@ const ChatPage = () => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
     }
-    
+
     setIsLoading(true);
     let currentConvId = activeId;
 
@@ -115,7 +115,7 @@ const ChatPage = () => {
       if (!isGuest && currentConvId) {
         await api.saveChatMessage(currentConvId, userMsg);
       }
-      
+
       // Step 2: Query the RAG AI Engine
       const response = await api.queryRAG(userMsg.content);
       const assistantMsg = {
@@ -161,20 +161,20 @@ const ChatPage = () => {
     <div className="chat-layout h-[calc(100vh-64px)] flex overflow-hidden">
       {/* LEFT SIDEBAR - History or Guest Sandbox Info */}
       <aside className="chat-sidebar p-4 hidden md:flex flex-col w-72 meng-sheet-side z-10 border-r border-white/10 bg-slate-950/40 backdrop-blur-2xl">
-        <motion.button 
+        <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
-          onClick={startNewChat} 
+          onClick={startNewChat}
           className="clay-btn w-full mb-6 py-3 shadow-lg font-bold flex items-center justify-center gap-2"
         >
           <Plus size={18} /> New Chat Session
         </motion.button>
-        
+
         <div className="text-xs font-black text-slate-400 mb-3 uppercase tracking-wider px-2 flex items-center justify-between">
           <span>{isGuest ? 'Session Mode' : 'Recent Conversations'}</span>
           {!isGuest && <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-slate-300">{conversations.length}</span>}
         </div>
-        
+
         {isGuest ? (
           <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.15)] space-y-3 mt-1">
             <div className="flex items-center gap-2 font-extrabold text-sm text-emerald-200">
@@ -201,11 +201,10 @@ const ChatPage = () => {
                 <div
                   key={conv.id}
                   onClick={() => loadConversation(conv.id)}
-                  className={`flex items-start gap-2.5 p-3 rounded-xl text-left transition-all duration-200 cursor-pointer group relative ${
-                    activeId === conv.id 
-                      ? 'bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-pink-500/10 border border-cyan-400/40 text-white shadow-lg shadow-cyan-500/10' 
+                  className={`flex items-start gap-2.5 p-3 rounded-xl text-left transition-all duration-200 cursor-pointer group relative ${activeId === conv.id
+                      ? 'bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-pink-500/10 border border-cyan-400/40 text-white shadow-lg shadow-cyan-500/10'
                       : 'hover:bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent'
-                  }`}
+                    }`}
                 >
                   <MessageSquare size={16} className={`mt-1 flex-shrink-0 transition-colors ${activeId === conv.id ? 'text-cyan-400' : 'text-slate-500 group-hover:text-indigo-400'}`} />
                   <div className="flex-1 overflow-hidden pr-6">
@@ -246,13 +245,12 @@ const ChatPage = () => {
             )}
           </div>
 
-          <button 
+          <button
             onClick={() => setSourcesPanelOpen(!sourcesPanelOpen)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-xs font-bold ${
-              sourcesPanelOpen 
-                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm' 
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-xs font-bold ${sourcesPanelOpen
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
                 : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 border border-white/10'
-            }`}
+              }`}
             title="Toggle Document Sources Panel"
           >
             <FileText size={14} className="text-pink-400" />
@@ -264,7 +262,7 @@ const ChatPage = () => {
 
         {messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5, type: "spring" }}
@@ -274,7 +272,7 @@ const ChatPage = () => {
               <motion.div animate={{ y: [-8, 8, -8], rotate: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut" }} className="absolute -top-4 -left-6 w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[0_10px_25px_rgba(245,158,11,0.5)] border border-white/40 z-20" />
               <motion.div animate={{ y: [8, -8, 8], rotate: [0, -25, 0] }} transition={{ repeat: Infinity, duration: 5.5, ease: "easeInOut" }} className="absolute -bottom-2 -right-6 w-11 h-11 rounded-full bg-gradient-to-br from-rose-400 to-pink-600 shadow-[0_10px_25px_rgba(244,63,94,0.5)] border border-white/40 z-20" />
               <motion.div animate={{ y: [-5, 5, -5] }} transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }} className="absolute -top-2 -right-3 w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-300 to-indigo-500 shadow-[0_8px_20px_rgba(34,211,238,0.4)] border border-white/40 z-20" />
-              
+
               {/* DesignCode 3D Hexagonal / Rounded Platform */}
               <div className="w-44 h-44 rounded-[42px] bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 p-1.5 shadow-[0_25px_60px_rgba(124,58,237,0.45)] border border-white/30 transform rotate-3 hover:rotate-0 transition-all duration-500 flex items-center justify-center relative">
                 <div className="w-full h-full bg-slate-950/90 rounded-[38px] flex items-center justify-center backdrop-blur-xl overflow-hidden shadow-inner p-4">
@@ -283,7 +281,7 @@ const ChatPage = () => {
               </div>
             </motion.div>
 
-            <motion.h1 
+            <motion.h1
               initial={{ y: 15, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.15, duration: 0.4 }}
@@ -292,7 +290,7 @@ const ChatPage = () => {
               How can I help you today?
             </motion.h1>
 
-            <motion.p 
+            <motion.p
               initial={{ y: 15, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.25, duration: 0.4 }}
@@ -300,7 +298,7 @@ const ChatPage = () => {
             >
               Ask me anything about your uploaded documents. I'll dynamically retrieve insights and synthesize verified citations with complete architectural persistence.
             </motion.p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl px-4">
               {[
                 "Summarize the key findings from the uploaded reports",
@@ -308,7 +306,7 @@ const ChatPage = () => {
                 "Extract all action items from the latest knowledge docs",
                 "Compare the pricing models and technical specs"
               ].map((prompt, i) => (
-                <motion.button 
+                <motion.button
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -329,7 +327,7 @@ const ChatPage = () => {
                 <ChatMessage key={idx} message={msg} />
               ))}
               {isLoading && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="message-wrapper flex items-start w-full my-2 justify-start"
@@ -361,7 +359,7 @@ const ChatPage = () => {
               className="flex-1 bg-transparent border-none text-slate-100 placeholder-slate-400 font-medium focus:outline-none resize-none py-2.5 text-sm md:text-base leading-relaxed max-h-48"
             />
             <div className="pb-1">
-              <motion.button 
+              <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleSend}
@@ -371,9 +369,6 @@ const ChatPage = () => {
                 <Send size={18} className={inputValue.trim() && !isLoading ? 'translate-x-0.5 -translate-y-0.5 transition-transform' : ''} />
               </motion.button>
             </div>
-          </div>
-          <div className="text-center mt-2.5 text-[11px] font-medium text-slate-500 tracking-wide">
-            AntiGravity AI OS can make mistakes. Check important document citations in the sources drawer.
           </div>
         </div>
       </main>
@@ -387,7 +382,7 @@ const ChatPage = () => {
           </div>
           <span className="px-3 py-0.5 rounded-full bg-white/10 border border-white/15 text-xs font-extrabold text-slate-300 shadow-inner">{currentSources.length}</span>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-4">
           {currentSources.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center opacity-60 px-4">
