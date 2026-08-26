@@ -1,28 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
+// Module scope: no temporal-dead-zone risk, and an unknown `size` can never throw.
+const SIZES = {
+  xs: { width: 22, height: 22, radius: 7,  eyeSize: 3,  eyeGap: 4,  visorHeight: 9,  visorWidth: 15 },
+  sm: { width: 36, height: 36, radius: 10, eyeSize: 5,  eyeGap: 6,  visorHeight: 14, visorWidth: 24 },
+  md: { width: 44, height: 44, radius: 14, eyeSize: 6,  eyeGap: 8,  visorHeight: 18, visorWidth: 30 },
+  lg: { width: 64, height: 64, radius: 20, eyeSize: 9,  eyeGap: 12, visorHeight: 26, visorWidth: 44 },
+  xl: { width: 96, height: 96, radius: 30, eyeSize: 14, eyeGap: 18, visorHeight: 38, visorWidth: 68 },
+};
+
 const AIMascot = ({ size = "md", state = "idle", className = "" }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isBlinking, setIsBlinking] = useState(false);
 
   // Automatic random blinking animation
   useEffect(() => {
+    let blinkTimer;
     const interval = setInterval(() => {
       if (state === "idle" && !isHovered) {
         setIsBlinking(true);
-        setTimeout(() => setIsBlinking(false), 200);
+        blinkTimer = setTimeout(() => setIsBlinking(false), 200);
       }
     }, 4500);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(blinkTimer);
+    };
   }, [state, isHovered]);
 
-  // Size sizing definitions
-  const dimensions = {
-    sm: { width: 36, height: 36, radius: 10, eyeSize: 5, eyeGap: 6, visorHeight: 14, visorWidth: 24 },
-    md: { width: 44, height: 44, radius: 14, eyeSize: 6, eyeGap: 8, visorHeight: 18, visorWidth: 30 },
-    lg: { width: 64, height: 64, radius: 20, eyeSize: 9, eyeGap: 12, visorHeight: 26, visorWidth: 44 },
-    xl: { width: 96, height: 96, radius: 30, eyeSize: 14, eyeGap: 18, visorHeight: 38, visorWidth: 68 },
-  }[size] || dimensions.md;
+  const dimensions = SIZES[size] || SIZES.md;
 
   // Eye shape generation based on mood
   const getEyeVariant = () => {
