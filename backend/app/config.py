@@ -6,9 +6,12 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None          # PostgreSQL URL from Render
     DB_PATH: str = "./rag_app.db"               # Fallback SQLite (local dev)
     CHROMA_PERSIST_DIR: str = "./chroma_data"
-    CHUNK_SIZE: int = 500
-    CHUNK_OVERLAP: int = 50
-    TOP_K: int = 5
+
+    # Larger chunks give better embedding/context density; overlap helps continuity.
+    CHUNK_SIZE: int = 1200
+    CHUNK_OVERLAP: int = 200
+    TOP_K: int = 6
+
     JWT_SECRET: str = "rag-assistant-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 480
