@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
     app.state.chroma_manager = ChromaManager(settings.CHROMA_PERSIST_DIR)
 
     # Start a background task to re-embed documents missing from Chroma.
-    async def reembed_missing_documents(app: FastAPI, concurrency: int = 4):
+    async def reembed_missing_documents(app: FastAPI, concurrency: int = 2):
         # Run in a background thread pool to avoid blocking the event loop with DB work.
         await asyncio.sleep(2)  # small delay so other startup tasks settle
         try:
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI):
             asyncio.create_task(worker(doc_id))
 
     # Kick off the re-embed task but don't await it so startup isn't blocked.
-    asyncio.create_task(reembed_missing_documents(app))
+    asyncio.create_task(reembed_missing_documents(app, concurrency=2))
 
     yield
 
