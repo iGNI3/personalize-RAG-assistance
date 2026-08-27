@@ -28,9 +28,12 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
 
     # Read file bytes into memory
+    MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File is too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
 
     original_fname = file.filename or "upload"
     temp_doc_id = os.urandom(8).hex()

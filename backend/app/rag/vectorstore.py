@@ -52,3 +52,15 @@ class ChromaManager:
         return {
             "count": self.collection.count()
         }
+
+    def has_document(self, doc_id: str) -> bool:
+        """Cheap existence check for a doc_id in the collection.
+        Uses a scoped get with a limit of 1 so we don't pull all vectors.
+        """
+        try:
+            res = self.collection.get(where={"doc_id": doc_id}, include=['ids'], limit=1)
+            ids = res.get('ids') or [[]]
+            return len(ids[0]) > 0
+        except Exception:
+            # Be conservative on error: assume document isn't present so caller can re-embed.
+            return False
